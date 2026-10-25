@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Swapnil Kag — Android Developer</title>
+  <meta name="description" content="Fold-phone Android simulation portfolio — apps by Swapnil Kag, Android developer." />
+  <link rel="icon" type="image/png" href="assets/img/name-left.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Sofia+Sans+Extra+Condensed:wght@400;500;600;700;800&family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body data-bg="basic" data-finish="titanium">
+
+  <!-- Fixed page header -->
+  <header class="site-header">
+    <a class="site-logo" href="#top">Swapnil Kag</a>
+  </header>
+
+  <!-- Scroll track: drives the unfold / fold-back -->
+  <div class="stage-wrap" id="stageWrap">
+    <div class="stage" id="stage">
+
+      <!-- Background layers -->
+      <div class="bg-name" aria-hidden="true">
+        <span class="bg-name-left">SWAPNIL</span>
+        <span class="bg-name-right">KAG</span>
+      </div>
+      <div class="bg-glow" aria-hidden="true"></div>
+      <div class="bg-orbit" aria-hidden="true">
+        <i class="ring ring-1"></i>
+        <i class="ring ring-2"></i>
+        <i class="ring ring-3"></i>
+        <i class="dot dot-1"></i>
+        <i class="dot dot-2"></i>
+      </div>
+
+      <!-- Device group (scaled to fit) -->
+      <div class="device-group" id="deviceGroup">
+
+        <!-- Unfolded device -->
+        <div class="device" id="device">
+          <div class="screen inner-screen">
+
+            <!-- Android status bar -->
+            <div class="statusbar">
+              <span class="statusbar-time" id="statusTime">09:41</span>
+              <span class="statusbar-icons">
+                <svg class="ic" viewBox="0 0 16 12" fill="currentColor"><path d="M8 9.6a1.4 1.4 0 1 0 0 2.8 1.4 1.4 0 0 0 0-2.8zM8 6c-1.6 0-3 .6-4.1 1.7l1.5 1.5C6.1 8.5 7 8.1 8 8.1s1.9.4 2.6 1.1l1.5-1.5C11 6.6 9.6 6 8 6zM8 2.4c-2.6 0-5 1-6.8 2.8l1.5 1.5C4.1 5.3 6 4.5 8 4.5s3.9.8 5.3 2.2l1.5-1.5C13 3.4 10.6 2.4 8 2.4z"/></svg>
+                5G <i class="signal"></i><i class="battery"></i>
+              </span>
+            </div>
+
+            <!-- HOME SCREEN -->
+            <div class="home-screen" id="homeScreen">
+              <div class="home-widget">
+                <div class="home-clock" id="homeClock">14:32</div>
+                <div class="home-date" id="homeDate">Friday, October 24</div>
+                <div class="home-tag">Swapnil Kag · Android Developer</div>
+              </div>
+              <div class="app-grid" id="appGrid"></div>
+              <div class="dock" id="dock"></div>
+            </div>
+
+            <!-- APP WINDOW (dual-pane on the fold display) -->
+            <div class="app-window" id="appWindow" hidden>
+              <aside class="app-rail" id="appRail"></aside>
+              <main class="app-body" id="appBody"></main>
+            </div>
+
+            <!-- RECENTS -->
+            <div class="recents" id="recents" hidden>
+              <p class="recents-title">Recent apps</p>
+              <div class="recents-cards" id="recentsCards"></div>
+              <button class="recents-clear" id="recentsClear">Clear all</button>
+            </div>
+
+            <!-- Android toast -->
+            <div class="toast" id="toast" hidden></div>
+
+            <!-- Android 3-button nav bar -->
+            <nav class="navbar" id="navbar">
+              <button class="nav-btn" id="navBack" title="Back" aria-label="Back">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 5v14L5 12z"/></svg>
+              </button>
+              <button class="nav-btn" id="navHome" title="Home" aria-label="Home">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="8.4"/></svg>
+              </button>
+              <button class="nav-btn" id="navRecents" title="Recents" aria-label="Recents">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="5" y="5" width="14" height="14" rx="2.5"/></svg>
+              </button>
+            </nav>
+
+            <!-- Center crease of the fold display -->
+            <div class="crease" aria-hidden="true"></div>
+          </div>
+        </div>
+
+        <!-- Folded cover phone (lock screen) -->
+        <div class="cover" id="cover">
+          <div class="screen cover-screen">
+            <div class="statusbar">
+              <span class="statusbar-time" id="coverTime">14:32</span>
+              <span class="statusbar-icons">5G <i class="signal"></i><i class="battery"></i></span>
+            </div>
+            <div class="cover-inner">
+              <p class="cover-role">Android developer</p>
+              <div class="notif">
+                <div class="notif-icon notif-icon-grad">📱</div>
+                <div>
+                  <p class="notif-title">My Apps 2.0 shipped</p>
+                  <p class="notif-sub">Play Console · crash-free 99.8%</p>
+                </div>
+              </div>
+              <div class="notif">
+                <div class="notif-icon notif-icon-grad">💼</div>
+                <div>
+                  <p class="notif-title">New LinkedIn invitation</p>
+                  <p class="notif-sub">Network · 2h ago</p>
+                </div>
+              </div>
+            </div>
+            <div class="cover-bottom">
+              <div class="call-card">
+                <div class="call-avatar">SK</div>
+                <div class="call-info">
+                  <p class="call-name">Swapnil Kag</p>
+                  <p class="call-sub">Incoming call · about your next role</p>
+                </div>
+                <a class="call-btn" href="tel:+910000000000">✆ <span>slide to talk</span></a>
+              </div>
+              <a class="cover-mail" href="mailto:swapnil@example.com">swapnil@example.com</a>
+            </div>
+            <div class="cover-hint" id="coverHint">
+              <span>Scroll to unfold</span>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 5l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /device-group -->
+
+      <!-- Stage controls -->
+      <div class="stage-controls">
+        <div class="ctl-group" role="radiogroup" aria-label="Background">
+          <button class="ctl-pill" data-bg="basic" aria-pressed="true">Basic</button>
+          <button class="ctl-pill" data-bg="glow" aria-pressed="false">Glow</button>
+          <button class="ctl-pill" data-bg="orbit" aria-pressed="false">Orbit</button>
+        </div>
+        <div class="ctl-group" role="radiogroup" aria-label="Finish">
+          <button class="ctl-dot ctl-dot-titanium" data-finish="titanium" title="Titanium" aria-pressed="true"></button>
+          <button class="ctl-dot ctl-dot-graphite" data-finish="graphite" title="Graphite" aria-pressed="false"></button>
+          <button class="ctl-dot ctl-dot-coral" data-finish="coral" title="Coral" aria-pressed="false"></button>
+          <button class="ctl-dot ctl-dot-sage" data-finish="sage" title="Sage" aria-pressed="false"></button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="main.js"></script>
+</body>
+</html>
