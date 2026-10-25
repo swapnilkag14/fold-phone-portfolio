@@ -12,13 +12,7 @@
 
   --bezel: linear-gradient(150deg, #55565c, #232429 46%, #3a3b41);
   --bezel-edge: rgba(255, 255, 255, 0.28);
-
-  --fit: 1;
-  --sx: 1;
-  --dev-op: 1;
-  --cov-op: 0;
-  --cov-rot: -28;
-  --rot: 0;
+  --z: .9;
 
   --android-bg: #10121a;
   --android-surface: #1b1d27;
@@ -66,23 +60,24 @@ button { font: inherit; border: 0; background: none; cursor: pointer; color: inh
 /* ------------------------------------------------------------
    Stage & track
    ------------------------------------------------------------ */
-.stage-wrap { position: relative; height: 3600px; }
+/* track height is set by JS: vh·(1+1.15+1.1+0.4) + inner scroll */
+.stage-wrap { position: relative; height: 480vh; }
 .stage {
   position: sticky; top: 0; height: 100vh; height: 100svh;
   overflow: hidden;
-  display: grid; place-items: center;
 }
 
-/* Giant background name */
+/* Giant background name — flanks the folded phone, slides out as it opens */
 .bg-name { position: absolute; inset: 0; z-index: 0; pointer-events: none; user-select: none; }
 .bg-name span {
-  position: absolute; top: 50%; transform: translateY(-52%);
+  position: absolute; top: 0; left: 0;
   font-family: var(--font-display); font-weight: 800;
   font-size: clamp(180px, 26vw, 420px); line-height: .8;
   color: #e7e7ee; letter-spacing: -.01em; white-space: nowrap;
+  will-change: transform, opacity;
 }
-.bg-name-left  { left: -.04em; }
-.bg-name-right { right: -.04em; }
+.bg-name-left  { transform-origin: 100% 50%; }
+.bg-name-right { transform-origin: 0% 50%; }
 
 /* Glow background theme */
 .bg-glow {
@@ -111,40 +106,82 @@ body[data-bg="orbit"] .bg-orbit .ring-1 { animation: orbit-spin 90s linear infin
 @keyframes orbit-spin { to { transform: translate(-50%,-50%) rotate(342deg); } }
 
 /* ------------------------------------------------------------
-   Device (unfolded) & cover (folded)
+   Fold device — 1080×736 design space, three true panels
    ------------------------------------------------------------ */
-.device-group {
-  position: relative; z-index: 2;
-  transform: scale(var(--fit));
+.device-pos {
+  position: absolute; left: 50%; top: 50%;
+  width: 0; height: 0; z-index: 2;
+}
+.device-rig {
+  position: absolute; left: -540px; top: -368px;
   width: 1080px; height: 736px;
-}
-.device, .cover {
-  position: absolute; inset: 0;
-  padding: 8px;
-  background: var(--bezel);
-  border-radius: 44px;
-  box-shadow:
-    0 0 0 1.5px var(--bezel-edge),
-    0 40px 90px -20px rgba(0,0,0,.35),
-    0 12px 30px rgba(0,0,0,.18);
-}
-.device {
+  transform: scale(var(--z, .9)) translate(-270px, 0);  /* folded initial state */
   transform-origin: 50% 50%;
-  transform: perspective(1800px) rotateY(calc(var(--rot) * 1deg)) scaleX(var(--sx));
-  opacity: var(--dev-op);
+  will-change: transform;
 }
-.cover {
-  left: 50%; top: 0; bottom: 0; right: auto;
-  margin-left: -267.5px;
-  width: 535px;
-  transform-origin: 78% 50%;
-  transform: perspective(1800px) rotateY(calc(var(--cov-rot) * 1deg));
-  opacity: var(--cov-op);
+.panel { position: absolute; top: 0; bottom: 0; width: 540px; }
+.panel-frame {
+  position: absolute; inset: 0;
+  background: var(--bezel);
+  box-shadow: 0 0 0 1.5px var(--bezel-edge);
 }
-.screen {
-  position: relative; width: 100%; height: 100%;
-  border-radius: 36px; overflow: hidden;
+.panel-screen {
+  position: absolute; overflow: hidden;
   background: var(--android-bg);
+}
+
+/* RIGHT (base) panel — hinged on its left edge */
+.panel-right { left: 540px; z-index: 1; }
+.panel-right .panel-frame {
+  border-radius: 0 44px 44px 0;                 /* JS morphs to 44px while folded */
+  box-shadow: 1px 0 0 var(--bezel-edge), 0 40px 90px -20px rgba(0,0,0,.30);
+}
+.screen-right { inset: 8px 8px 8px 0; border-radius: 0 36px 36px 0; }  /* JS morphs to 36px */
+
+/* LEAF (swinging inner screen) — hinged on its right edge */
+.panel-leaf {
+  left: 0; z-index: 2;
+  transform-origin: 100% 50%;
+  transform: perspective(2800px) rotateY(180deg);  /* folded initial state */
+  will-change: transform;
+}
+.panel-leaf .panel-frame {
+  border-radius: 44px 0 0 44px;
+  box-shadow: -1px 0 0 var(--bezel-edge), 0 40px 90px -20px rgba(0,0,0,.30);
+}
+.screen-leaf { inset: 8px 0 8px 8px; border-radius: 36px 0 0 36px; }
+
+/* COVER (front screen while folded) — hinged on its left edge */
+.panel-cover { left: 540px; z-index: 3; transform-origin: 0% 50%; will-change: transform; }
+.panel-cover .panel-frame {
+  border-radius: 44px;
+  box-shadow: 0 0 0 1.5px var(--bezel-edge), 0 40px 90px -20px rgba(0,0,0,.4), 0 12px 30px rgba(0,0,0,.2);
+}
+.panel-cover .panel-screen { inset: 8px; border-radius: 36px; }
+
+/* The unfolded screen content plane — 1064×720, split across the two screens */
+.plane { position: absolute; top: 0; width: 1064px; height: 720px; }
+.screen-right .plane { left: -532px; }
+.screen-leaf  .plane { left: 0; }
+
+/* Fold shadows (opacity driven by JS) */
+.sh { position: absolute; inset: 0; pointer-events: none; opacity: 0; z-index: 5; }
+.sh-f { border-radius: 36px 0 0 36px;
+  background: linear-gradient(100deg, rgba(0,0,0,.9), rgba(0,0,0,.32) 45%, transparent 78%); }
+.sh-b { border-radius: 36px;
+  background: linear-gradient(260deg, rgba(0,0,0,.9), rgba(0,0,0,.3) 45%, transparent 78%); }
+.sh-r { border-radius: 0 36px 36px 0;             /* JS morphs to 36px while folded */
+  background: linear-gradient(to right, rgba(0,0,0,.75), rgba(0,0,0,.18) 35%, transparent 68%); }
+
+/* Soft floor shadow under the device */
+.phone-shadow {
+  position: absolute; left: 50%; top: 70%;
+  width: 900px; height: 64px;
+  pointer-events: none; z-index: 1;
+  background: radial-gradient(50% 50% at 50% 50%, rgba(0,0,0,.30), rgba(0,0,0,0) 70%);
+  filter: blur(8px);
+  transform: translateX(-50%);
+  will-change: transform;
 }
 
 /* Android status bar */
@@ -164,19 +201,18 @@ body[data-bg="orbit"] .bg-orbit .ring-1 { animation: orbit-spin 90s linear infin
 .battery { width: 18px; height: 9px; border-radius: 2px;
   clip-path: inset(0 3px 0 0 round 2px); }
 
-/* fold crease */
+/* fold crease — the hinge seam down the middle of the open display */
 .crease {
-  position: absolute; top: 0; bottom: 0; left: 50%; width: 10px; z-index: 18;
-  transform: translateX(-50%); pointer-events: none;
+  position: absolute; top: 8px; bottom: 8px; left: 540px; width: 12px;
+  margin-left: -6px; z-index: 6; pointer-events: none;
   background: linear-gradient(90deg,
     transparent 0%, rgba(0,0,0,.07) 35%,
-    rgba(0,0,0,.13) 50%, rgba(0,0,0,.07) 65%, transparent 100%);
+    rgba(0,0,0,.14) 50%, rgba(0,0,0,.07) 65%, transparent 100%);
 }
 
 /* ------------------------------------------------------------
-   HOME SCREEN
+   HOME SCREEN (lives inside the 1064×720 content plane)
    ------------------------------------------------------------ */
-.inner-screen { width: 1064px; height: 720px; }
 .home-screen {
   position: absolute; inset: 0;
   background:
@@ -184,8 +220,14 @@ body[data-bg="orbit"] .bg-orbit .ring-1 { animation: orbit-spin 90s linear infin
     radial-gradient(80% 90% at 90% 100%, rgba(120,60,140,.4), transparent 60%),
     linear-gradient(160deg, #171a26 0%, #10121a 55%, #0d0f16 100%);
   display: flex; flex-direction: column;
-  padding: 52px 44px 66px;
+  padding: 52px 44px 58px;
 }
+.home-scroll {
+  flex: 1; min-height: 0;
+  overflow-y: hidden;
+  overscroll-behavior: contain;
+}
+.home-widget { margin-bottom: 22px; padding-left: 4px; }
 .home-widget { margin-bottom: 26px; padding-left: 4px; }
 .home-clock {
   font-family: var(--font-display); font-weight: 700;
@@ -200,11 +242,37 @@ body[data-bg="orbit"] .bg-orbit .ring-1 { animation: orbit-spin 90s linear infin
 }
 
 .app-grid {
-  flex: 1; display: grid;
+  display: grid;
   grid-template-columns: repeat(6, 1fr);
-  grid-auto-rows: 108px; gap: 8px 6px;
+  grid-auto-rows: 104px; gap: 8px 6px;
   align-content: start;
+  margin-bottom: 22px;
 }
+.home-extras { padding: 0 6px 24px; }
+.home-label {
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .16em;
+  text-transform: uppercase; color: rgba(255,255,255,.55);
+  margin: 18px 0 10px;
+}
+.featured-card {
+  display: grid; grid-template-columns: 76px 1fr; gap: 18px; align-items: center;
+  background: rgba(255,255,255,.07);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 22px; padding: 20px 22px;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.featured-card .tile {
+  width: 76px; height: 76px; border-radius: 20px;
+  display: grid; place-items: center; font-size: 36px;
+  box-shadow: 0 8px 18px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.18);
+}
+.featured-card h4 { color: #fff; font-size: 19px; margin-bottom: 4px; }
+.featured-card p { color: rgba(255,255,255,.7); font-size: 13px; line-height: 1.5; }
+.featured-card .fmeta {
+  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .1em;
+  text-transform: uppercase; color: rgba(255,255,255,.5); margin-top: 8px;
+}
+.chips-home .chip { color: #e8eaef; background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.14); }
 .app-icon {
   display: flex; flex-direction: column; align-items: center; gap: 8px;
   padding-top: 6px; border-radius: 18px;
@@ -230,7 +298,7 @@ body[data-bg="orbit"] .bg-orbit .ring-1 { animation: orbit-spin 90s linear infin
 
 /* Dock */
 .dock {
-  margin-top: 10px; padding: 10px 14px;
+  margin-top: 10px; flex: none; padding: 10px 14px;
   background: rgba(255,255,255,.09);
   backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
   border: 1px solid rgba(255,255,255,.1);
@@ -440,7 +508,7 @@ body[data-bg="orbit"] .bg-orbit .ring-1 { animation: orbit-spin 90s linear infin
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
 /* ------------------------------------------------------------
-   Cover (lock) screen
+   Cover (lock) screen — the front face while folded
    ------------------------------------------------------------ */
 .cover-screen { background: #141210; }
 .cover-screen::before {
@@ -452,8 +520,16 @@ body[data-bg="orbit"] .bg-orbit .ring-1 { animation: orbit-spin 90s linear infin
   content: ""; position: absolute; inset: 0;
   background: linear-gradient(180deg, rgba(10,8,6,.55), rgba(10,8,6,.15) 40%, rgba(10,8,6,.75));
 }
-.cover-inner, .cover-bottom, .cover-hint { z-index: 2; }
-.cover-inner { position: absolute; top: 64px; left: 22px; right: 22px; }
+.cover-clock, .cover-inner, .cover-bottom, .cover-hint, .call-screen { z-index: 2; }
+.cover-clock { position: absolute; top: 86px; left: 34px; right: 34px; text-align: center; }
+.cover-clock-time {
+  font-family: var(--font-display); font-weight: 700;
+  font-size: 92px; line-height: .95; color: #fff;
+}
+.cover-clock-date {
+  font-size: 12.5px; color: rgba(255,255,255,.72); margin-top: 6px;
+}
+.cover-inner { position: absolute; top: 236px; left: 22px; right: 22px; }
 .cover-role {
   font-family: var(--font-mono); font-size: 11px; letter-spacing: .12em;
   text-transform: uppercase; color: rgba(255,255,255,.75); margin-bottom: 26px;
@@ -474,31 +550,6 @@ body[data-bg="orbit"] .bg-orbit .ring-1 { animation: orbit-spin 90s linear infin
   text-transform: uppercase; color: rgba(255,255,255,.55); margin-top: 4px; line-height: 1.5;
 }
 .cover-bottom { position: absolute; left: 22px; right: 22px; bottom: 92px; }
-.call-card {
-  display: flex; align-items: center; gap: 12px;
-  background: rgba(255,255,255,.1);
-  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255,255,255,.08);
-  border-radius: 20px; padding: 12px 14px; margin-bottom: 14px;
-  flex-wrap: wrap;
-}
-.call-avatar {
-  width: 42px; height: 42px; border-radius: 50%; flex: none;
-  display: grid; place-items: center;
-  background: linear-gradient(145deg, #4f8cff, #2455d6);
-  color: #fff; font-weight: 600; font-size: 14px;
-}
-.call-name { color: #fff; font-size: 13.5px; font-weight: 600; }
-.call-sub { font-size: 11px; color: rgba(255,255,255,.6); margin-top: 2px; }
-.call-btn {
-  margin-left: auto;
-  display: inline-flex; align-items: center; gap: 6px;
-  background: #30d158; color: #06280f;
-  font-size: 11.5px; font-weight: 600;
-  border-radius: 999px; padding: 8px 14px;
-  transition: transform .25s ease;
-}
-.call-btn:hover { transform: scale(1.05); }
 .cover-mail {
   display: block; text-align: center;
   font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .1em;
@@ -512,6 +563,42 @@ body[data-bg="orbit"] .bg-orbit .ring-1 { animation: orbit-spin 90s linear infin
 }
 .cover-hint svg { animation: hint-bounce 1.8s ease infinite; }
 @keyframes hint-bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(5px); } }
+
+/* Incoming-call screen — fades in while the phone folds shut */
+.call-screen {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; text-align: center;
+  background: rgba(12,10,8,.72);
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  opacity: 0; pointer-events: none;
+}
+.call-screen-label {
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .2em;
+  text-transform: uppercase; color: rgba(255,255,255,.6);
+}
+.call-avatar {
+  width: 42px; height: 42px; border-radius: 50%; flex: none;
+  display: grid; place-items: center;
+  background: linear-gradient(145deg, #4f8cff, #2455d6);
+  color: #fff; font-weight: 600; font-size: 14px;
+}
+.call-avatar-big {
+  width: 76px; height: 76px; font-size: 24px;
+  box-shadow: 0 14px 34px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.25);
+}
+.call-screen-name { color: #fff; font-size: 21px; font-weight: 600; }
+.call-screen-sub { font-size: 12px; color: rgba(255,255,255,.62); margin-top: -4px; }
+.call-accept {
+  display: inline-flex; align-items: center; gap: 8px;
+  margin-top: 20px;
+  background: #34d158; color: #06280f;
+  font-size: 13px; font-weight: 600;
+  border-radius: 999px; padding: 12px 22px;
+  box-shadow: 0 12px 28px rgba(52,209,88,.35);
+  transition: transform .25s ease;
+}
+.call-accept:hover { transform: scale(1.05); }
 
 /* ------------------------------------------------------------
    Stage controls
@@ -552,20 +639,26 @@ body[data-bg="orbit"] .bg-orbit .ring-1 { animation: orbit-spin 90s linear infin
    Mobile: mockup becomes a native phone page
    ------------------------------------------------------------ */
 @media (max-width: 920px) {
-  .stage-wrap { height: auto; }
+  .stage-wrap { height: auto !important; }
   .stage { position: static; height: auto; overflow: visible; display: block; padding: 76px 0 0; }
-  .bg-name { display: none; }
-  .bg-glow, .bg-orbit { display: none; }
-  .device-group { transform: none; width: 100%; height: auto; }
-  .device {
-    position: relative; inset: auto; width: 100%; max-width: 420px;
-    margin: 0 auto; padding: 6px;
-    transform: none !important; opacity: 1 !important;
-    border-radius: 28px;
+  .bg-name, .bg-glow, .bg-orbit, .phone-shadow, .crease, .sh { display: none; }
+  .device-pos { position: static; width: auto; transform: none !important; }
+  .device-rig {
+    position: static; transform: none !important;
+    width: 100%; max-width: 430px; height: auto;
+    margin: 0 auto;
+    display: flex; flex-direction: column;
   }
-  .inner-screen { width: 100%; height: 720px; border-radius: 22px; }
-  .crease { display: none; }
-  .home-screen { padding: 48px 22px 62px; }
+  .panel { position: static; width: 100%; height: 720px; }
+  .panel-leaf { display: none; }
+  .panel-cover { order: -1; height: 580px; max-width: 340px; margin: 0 auto 28px; }
+  .panel-cover .panel-frame { border-radius: 30px; }
+  .panel-cover .panel-screen { inset: 6px; border-radius: 24px; }
+  .panel-right .panel-frame { border-radius: 28px; }
+  .screen-right { inset: 6px; border-radius: 22px !important; }
+  .screen-right .plane { position: relative; left: 0; width: 100%; height: 100%; }
+  .home-screen { padding: 48px 22px 58px; }
+  .home-scroll { overflow-y: auto; }
   .home-clock { font-size: 58px; }
   .app-grid { grid-template-columns: repeat(4, 1fr); grid-auto-rows: 100px; }
   .app-icon .tile { width: 52px; height: 52px; font-size: 24px; }
@@ -575,16 +668,13 @@ body[data-bg="orbit"] .bg-orbit .ring-1 { animation: orbit-spin 90s linear infin
   .app-body { padding: 18px 20px 70px; }
   .app-title { font-size: 32px; }
   .dialer-key { height: 54px; }
-  .cover {
-    position: relative; inset: auto; width: 100%; max-width: 340px;
-    height: 580px; margin: 0 auto 28px; padding: 6px; border-radius: 30px;
-    transform: none !important; opacity: 1 !important;
-  }
-  .cover .screen { border-radius: 24px; }
-  .call-card { flex-wrap: wrap; }
-  .call-btn { margin-left: 54px; }
+  .cover-clock { top: 64px; }
+  .cover-clock-time { font-size: 72px; }
+  .cover-inner { top: 200px; }
+  .call-avatar-big { width: 64px; height: 64px; }
   .stage-controls {
-    position: static; flex-direction: row; justify-content: center;
+    position: static; opacity: 1 !important;
+    flex-direction: row; justify-content: center;
     flex-wrap: wrap; padding: 24px 16px 40px;
   }
   .site-header { padding: 0 20px; }

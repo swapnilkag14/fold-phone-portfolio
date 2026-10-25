@@ -25,6 +25,14 @@ const DATA = {
   ],
   bio:
     "I'm an Android developer who cares about cold starts, clean architecture and interfaces that feel native. I ship production apps in Kotlin, love Jetpack Compose, and break things on emulators so users never see them break in production.",
+  featured: "p1",
+  certifications: [
+    "🎓 Google Associate Android Developer",
+    "🧭 Jetpack Compose Pathway",
+    "⚙️ Android Kotlin Fundamentals",
+    "🏪 Play Academy — Store listings",
+    "🧪 Android Performance",
+  ],
   experience: [
     { role: "Android Developer", org: "Current company", period: "2023 — now",
       desc: "Own the Android app end to end: Compose migration, modularisation, CI and Play releases." },
@@ -102,6 +110,10 @@ const APPS = [
   { id: "settings",  name: "Settings",  type: "system", emoji: "⚙️" },
   { id: "calculator",name: "Calculator",type: "system", emoji: "🧮" },
   { id: "clock",     name: "Clock",     type: "system", emoji: "⏰" },
+  { id: "maps",      name: "Maps",      type: "system", emoji: "🗺️" },
+  { id: "music",     name: "Music",     type: "system", emoji: "🎵" },
+  { id: "weather",   name: "Weather",   type: "system", emoji: "⛅" },
+  { id: "recorder",  name: "Recorder",  type: "system", emoji: "🎙️" },
 ];
 const DOCK = [
   { id: "dialer",   name: "Phone",   type: "dialer", emoji: "📞", grad: "linear-gradient(145deg,#5ee08a,#1f9d55)" },
@@ -112,77 +124,263 @@ const DOCK = [
 const appById = (id) => APPS.concat(DOCK).find((a) => a.id === id);
 
 /* ================================================================
-   Scroll engine (unfold / fold-back) — same mechanics as before
+   Scroll engine — exact port of the Foldfolio fold mechanics
+   ----------------------------------------------------------------
+   One sticky stage; scroll progress e (px, from the track top) is
+   exponentially smoothed (12%/frame, dt-normalised) and split into:
+     open  a = e / (1.15·vh · 0.9)          easeInOutCubic
+     inner s = (e − 1.15·vh) / scale         clamped to content
+     close o = (e − open − inner − 8%·1.1·vh) / (92%·1.1·vh)
+     c = ease(a)·(1−ease(o))   u = 1−c (fold amount)   d = 180·u
+   leaf  : perspective(2800px) rotateY(d)      hinged right edge
+   cover : perspective(2800px) rotateY(d−180)  hinged left edge
+   device: translate(−u·W/4, sin(t/1500)·5·u)  idle float while folded
    ================================================================ */
 (function () {
-  const TRACK = document.getElementById("stageWrap");
-  const DEVICE = document.getElementById("device");
-  const COVER = document.getElementById("cover");
-  const GROUP = document.getElementById("deviceGroup");
-  const HINT = document.getElementById("coverHint");
+  const wrap = document.getElementById("stageWrap");
+  const pos = document.getElementById("devicePos");
+  const rig = document.getElementById("deviceRig");
+  const leaf = document.getElementById("panelLeaf");
+  const cover = document.getElementById("panelCover");
+  const rightPanel = document.getElementById("panelRight");
+  const screenRight = document.getElementById("screenRight");
+  const shF = document.getElementById("shF");
+  const shB = document.getElementById("shB");
+  const shR = document.getElementById("shR");
+  const crease = document.getElementById("crease");
+  const shadow = document.getElementById("phoneShadow");
+  const planeLive = document.getElementById("planeLive");
+  const planeClone = document.getElementById("planeClone");
+  const homeScroll = document.getElementById("homeScroll");
+  const nmL = document.getElementById("bgNameL");
+  const nmR = document.getElementById("bgNameR");
+  const callScreen = document.getElementById("callScreen");
+  const hint = document.getElementById("coverHint");
+  const controls = document.getElementById("stageControls");
 
-  const PHASE = { unfoldEnd: 0.25, foldStart: 0.75 };
+  // Reference device geometry + motion config (vh multiples)
+  const DEV_W = 1080, DEV_H = 736;
+  const OPEN_LEN = 1.15, CLOSE_LEN = 1.1, HOLD_LEN = 0.4, SMOOTH = 0.12;
+  const TOP_SPACE = 76, BOTTOM_SPACE = 44;
+
+  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  const easeIO = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+  const easeOut3 = (t) => 1 - Math.pow(1 - t, 3);
   const isMobile = () => window.matchMedia("(max-width: 920px)").matches;
-  const clamp01 = (v) => Math.min(1, Math.max(0, v));
-  const lerp = (a, b, t) => a + (b - a) * t;
-  const smooth = (t) => t * t * (3 - 2 * t);
+  const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  let target = 0, current = 0, lastApplied = -1;
+  let vw = 0, vh = 800, z = 0.9, cy = 0;
+  let U1 = 0, U2 = 0, innerMax = 0, innerPx = 0, sectionTop = 0;
+  let cur = 0, lastU = 1, lastS = -1, lastRad = "";
+  let running = false, lastT = 0;
+  const nmSize = { L: { w: 1, h: 1 }, R: { w: 1, h: 1 } };
 
+  const rightFrame = rightPanel.querySelector(".panel-frame");
+
+  /* ---------------- leaf-screen visual mirror ---------------- */
+  function buildClone() {
+    const src = planeLive.cloneNode(true);
+    src.removeAttribute("id");
+    src.querySelectorAll("[id]").forEach((el) => el.removeAttribute("id"));
+    src.querySelectorAll("script").forEach((el) => el.remove());
+    planeClone.replaceChildren(...src.childNodes);
+    syncCloneScroll();
+  }
+  function syncCloneScroll() {
+    const cs = planeClone.querySelectorAll(".home-scroll, .app-rail, .app-body");
+    const ls = planeLive.querySelectorAll(".home-scroll, .app-rail, .app-body");
+    for (let i = 0; i < cs.length && i < ls.length; i++) cs[i].scrollTop = ls[i].scrollTop;
+  }
+  // Keep the mirror in sync with any DOM change inside the live plane
+  let clonePending = false;
+  new MutationObserver(() => {
+    if (clonePending) return;
+    clonePending = true;
+    requestAnimationFrame(() => { clonePending = false; buildClone(); });
+  }).observe(planeLive, {
+    childList: true, subtree: true, characterData: true,
+    attributes: true, attributeFilter: ["class", "hidden"],
+  });
+  // Clicks on the mirrored left half are replayed on the live plane
+  planeClone.addEventListener("click", (e) => {
+    const t = e.target.closest("a,button,[data-action],[data-app]");
+    e.preventDefault();
+    e.stopPropagation();
+    if (!t) return;
+    const mirrorAll = planeClone.querySelectorAll("a,button,[data-action],[data-app]");
+    const i = Array.prototype.indexOf.call(mirrorAll, t);
+    if (i < 0) return;
+    const liveAll = planeLive.querySelectorAll("a,button,[data-action],[data-app]");
+    if (liveAll[i]) liveAll[i].click();
+  });
+
+  /* ---------------- measurement ---------------- */
   function measure() {
-    if (isMobile()) { GROUP.style.setProperty("--fit", 1); return; }
-    const vw = window.innerWidth, vh = window.innerHeight;
-    const fit = Math.min(1, (vw - 96) / 1080, (vh - 150) / 736);
-    GROUP.style.setProperty("--fit", fit.toFixed(4));
+    vw = window.innerWidth;
+    vh = window.innerHeight;
+    if (isMobile()) { wrap.style.height = "auto"; return; }
+    const availH = Math.max(200, vh - TOP_SPACE - BOTTOM_SPACE);
+    z = Math.min((vw * 0.9) / DEV_W, availH / DEV_H, 1.3);
+    cy = Math.round(TOP_SPACE + availH / 2);
+    pos.style.top = cy + "px";
+    rig.style.transform = `scale(${z.toFixed(4)})`;
+    U1 = vh * OPEN_LEN;
+    U2 = vh * CLOSE_LEN;
+    innerMax = Math.max(0, homeScroll.scrollHeight - homeScroll.clientHeight);
+    innerPx = innerMax * z;
+    wrap.style.height = Math.round(vh + U1 + innerPx + U2 + vh * HOLD_LEN) + "px";
+    sectionTop = wrap.getBoundingClientRect().top + window.scrollY;
+    shadow.style.width = Math.round(DEV_W * z * 0.96) + "px";
+    shadow.style.top = Math.round(cy + (DEV_H * z) / 2 - 26) + "px";
+    nmSize.L = { w: Math.max(1, nmL.offsetWidth), h: Math.max(1, nmL.offsetHeight) };
+    nmSize.R = { w: Math.max(1, nmR.offsetWidth), h: Math.max(1, nmR.offsetHeight) };
+    apply(cur, performance.now());
   }
-  function readScroll() {
-    const scrollable = TRACK.offsetHeight - window.innerHeight;
-    target = scrollable > 0 ? clamp01(window.scrollY / scrollable) : 0;
-  }
-  function apply() {
-    const p = current;
-    const opening = clamp01(p / PHASE.unfoldEnd);
-    const closing = clamp01((p - PHASE.foldStart) / (1 - PHASE.foldStart));
-    const open = smooth(clamp01(opening - closing));
 
-    // When fully open/folded, clear the transform entirely so hit-testing
-    // and click actionability see a stable, static element.
-    if (open >= 0.999) {
-      DEVICE.style.transform = "none";
+  /* ---------------- the fold state machine ---------------- */
+  function apply(e, now) {
+    if (isMobile()) return;
+    const a = U1 > 0 ? clamp(e / (U1 * 0.9), 0, 1) : 1;
+    const s = clamp((e - U1) / z, 0, innerMax);
+    const o = U2 > 0 ? clamp((e - U1 - innerPx - U2 * 0.08) / (U2 * 0.92), 0, 1) : 0;
+    const c = easeIO(a) * (1 - easeIO(o));
+    const u = +(1 - c).toFixed(4);
+    const d = 180 * u;
+    lastU = u;
+
+    // Fold translate keeps the stack centred; gentle idle float while folded.
+    // translate comes AFTER scale so it lives in the device's own (scaled) space,
+    // exactly like the original: rendered shift = -u·W/4·scale.
+    const floatY = u > 0 ? Math.sin(now / 1500) * 5 * u : 0;
+    rig.style.transform = u < 0.003
+      ? `scale(${z.toFixed(4)})`
+      : `scale(${z.toFixed(4)}) translate(${(-u * DEV_W / 4).toFixed(2)}px, ${floatY.toFixed(2)}px)`;
+
+    // The swinging flap: leaf and cover are its two faces
+    const front = d < 90;
+    leaf.style.visibility = front ? "visible" : "hidden";
+    leaf.style.transform = d < 0.2
+      ? "none"
+      : `perspective(2800px) rotateY(${d.toFixed(3)}deg)`;
+    cover.style.visibility = front ? "hidden" : "visible";
+    cover.style.transform = d > 179.8
+      ? "none"
+      : `perspective(2800px) rotateY(${(d - 180).toFixed(3)}deg)`;
+    crease.style.visibility = d > 176 ? "hidden" : "visible";
+
+    // Right panel corners: fully rounded while folded, outer-only when open
+    const rad = front ? "r" : "f";
+    if (rad !== lastRad) {
+      lastRad = rad;
+      const f = front ? "0px 44px 44px 0px" : "44px";
+      const fs = front ? "0px 36px 36px 0px" : "36px";
+      rightFrame.style.borderRadius = f;
+      screenRight.style.borderRadius = fs;
+      shR.style.borderRadius = fs;
+    }
+
+    // Inner screens go dark when nearly folded; scroll with the page
+    const pv = u > 0.985 ? "hidden" : "inherit";
+    planeLive.style.visibility = pv;
+    planeClone.style.visibility = pv;
+    if (Math.abs(s - lastS) > 0.05) {
+      lastS = s;
+      homeScroll.scrollTop = s;
+      syncCloneScroll();
+    }
+
+    // Fold shadows
+    shF.style.opacity = front ? (Math.pow(d / 90, 1.6) * 0.8).toFixed(3) : "0";
+    shB.style.opacity = front ? "0" : (Math.pow(2 - d / 90, 1.6) * 0.7).toFixed(3);
+    shR.style.opacity = (Math.pow(Math.sin((d * Math.PI) / 180), 1.8) * 0.5).toFixed(3);
+
+    // Incoming-call screen fades in while the phone folds shut
+    const co = clamp((o - 0.02) * 6, 0, 1);
+    callScreen.style.opacity = co.toFixed(3);
+    callScreen.style.pointerEvents = co > 0.5 ? "auto" : "none";
+
+    // Floor shadow halves under the folded stack
+    shadow.style.transform = `translateX(-50%) scaleX(${(0.5 + 0.5 * c).toFixed(4)})`;
+
+    // Giant names flank the folded phone, slide out + fade as it opens
+    const y = DEV_W * z, half = y / 2, gap = half * 0.06;
+    const dd = half / 2 - gap + (vw * 0.22 + y / 4) * easeOut3(c);
+    const area = (vw - y) / 2, sh2 = vh * 0.42;
+    const sl = Math.min((area - vw * 0.03 + gap) / nmSize.L.w, sh2 / nmSize.L.h);
+    const sr = Math.min((area - vw * 0.03 + gap) / nmSize.R.w, sh2 / nmSize.R.h);
+    nmL.style.transform =
+      `translate(calc(${(vw / 2 - dd).toFixed(1)}px - 100%), ${cy}px) translateY(-50%) scale(${sl.toFixed(4)})`;
+    nmR.style.transform =
+      `translate(${(vw / 2 + dd).toFixed(1)}px, ${cy}px) translateY(-50%) scale(${sr.toFixed(4)})`;
+    const nmOp = (1 - c * 0.9).toFixed(3);
+    nmL.style.opacity = nmOp;
+    nmR.style.opacity = nmOp;
+
+    if (hint) hint.style.opacity = clamp(1 - e / 120, 0, 1).toFixed(3);
+    if (controls) controls.style.opacity = c.toFixed(3);
+  }
+
+  /* ---------------- smoothed scroll loop ---------------- */
+  const target = () => Math.max(0, window.scrollY - sectionTop);
+
+  // Advance the exponential smoother one tick; returns true while it should keep running
+  function advance(now) {
+    const t = target();
+    const dt = lastT ? Math.min(64, now - lastT) : 16.7;
+    lastT = now;
+    if (reduced()) {
+      cur = t;
     } else {
-      const sx = lerp(0.4954, 1, open);
-      const rot = lerp(-14, 0, open);
-      DEVICE.style.transform = `perspective(1800px) rotateY(${rot.toFixed(2)}deg) scaleX(${sx.toFixed(4)})`;
+      // subdivide long gaps so the smoothing curve stays the same as per-frame ticking
+      let rem = dt;
+      while (rem > 0) {
+        const stepDt = Math.min(66.7, rem);
+        rem -= stepDt;
+        const f = 1 - Math.pow(1 - SMOOTH, stepDt / 16.67);
+        cur += (t - cur) * f;
+      }
+      if (Math.abs(t - cur) < 0.1) cur = t;
     }
-    DEVICE.style.opacity = clamp01(open * 1.6).toFixed(3);
-
-    const covOp = clamp01(1 - open * 1.8);
-    if (covOp <= 0.001) {
-      COVER.style.transform = "none";
-      COVER.style.opacity = "0";
-      COVER.style.pointerEvents = "none";
-    } else {
-      const covRot = lerp(0, -38, open);
-      COVER.style.transform = `perspective(1800px) rotateY(${covRot.toFixed(2)}deg)`;
-      COVER.style.opacity = covOp.toFixed(3);
-      COVER.style.pointerEvents = covOp > 0.5 ? "auto" : "none";
-    }
-
-    if (HINT) HINT.style.opacity = clamp01(1 - p * 6).toFixed(3);
-  }
-  function frame() {
-    current += (target - current) * 0.14;
-    if (Math.abs(target - current) < 0.0004) current = target;
-    if (!isMobile() && Math.abs(current - lastApplied) > 0.00005) {
-      apply();
-      lastApplied = current;
-    }
-    requestAnimationFrame(frame);
+    apply(cur, now);
+    return cur !== t || (!reduced() && lastU > 0.0005);   // idle float keeps ticking while folded
   }
 
-  window.addEventListener("resize", () => { measure(); readScroll(); });
-  window.addEventListener("scroll", readScroll, { passive: true });
-  measure(); readScroll(); current = target; apply(); frame();
+  function step(now) {
+    if (advance(now)) requestAnimationFrame(step);
+    else running = false;
+  }
+  function wake() {
+    if (isMobile()) return;
+    if (!running) { running = true; requestAnimationFrame(step); }
+  }
+
+  window.addEventListener("scroll", wake, { passive: true });
+  window.addEventListener("resize", () => { measure(); wake(); });
+  document.addEventListener("visibilitychange", wake);
+  window.addEventListener("pageshow", wake);
+  // Watchdog: some webviews/panes stop firing rAF and even scroll events while
+  // unfocused, but timers still run — keep the fold following the scrollbar there.
+  setInterval(() => {
+    if (isMobile()) return;
+    if (performance.now() - lastT > 150) advance(performance.now());
+  }, 120);
+
+  function init() {
+    buildClone();
+    measure();
+    cur = target();
+    apply(cur, performance.now());
+    wake();
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+  // Content height settles late (fonts, images) — re-measure like the original
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { measure(); wake(); });
+  window.addEventListener("load", () => { measure(); wake(); });
+  setTimeout(() => { measure(); wake(); }, 1200);
 })();
 
 /* ================================================================
@@ -193,6 +391,8 @@ const appById = (id) => APPS.concat(DOCK).find((a) => a.id === id);
   const cv = document.getElementById("coverTime");
   const hc = document.getElementById("homeClock");
   const hd = document.getElementById("homeDate");
+  const cc = document.getElementById("coverClock");
+  const cd = document.getElementById("coverDate");
   function tick() {
     const d = new Date();
     const hh = String(d.getHours()).padStart(2, "0");
@@ -201,7 +401,10 @@ const appById = (id) => APPS.concat(DOCK).find((a) => a.id === id);
     if (st) st.textContent = t;
     if (cv) cv.textContent = t;
     if (hc) hc.textContent = t;
-    if (hd) hd.textContent = d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+    if (cc) cc.textContent = t;
+    const date = d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+    if (hd) hd.textContent = date;
+    if (cd) cd.textContent = date;
   }
   tick();
   setInterval(tick, 15000);
@@ -225,6 +428,22 @@ function iconEl(app, forDock) {
 }
 APPS.forEach((a) => grid.appendChild(iconEl(a, false)));
 DOCK.forEach((a) => dock.appendChild(iconEl(a, true)));
+
+/* Home extras: featured app + certifications */
+(function () {
+  const f = DATA.projects.find((p) => p.id === DATA.featured) || DATA.projects[0];
+  document.getElementById("featuredCard").innerHTML = `
+    <button class="featured-card" data-action="open" data-app="projects" style="width:100%;text-align:left">
+      <span class="tile" style="background:${f.grad}">${f.emoji}</span>
+      <span>
+        <h4>${f.name}</h4>
+        <p>${f.tagline}</p>
+        <p class="fmeta">${f.category}</p>
+      </span>
+    </button>`;
+  document.getElementById("certChips").innerHTML =
+    DATA.certifications.map((c) => `<span class="chip">${c}</span>`).join("");
+})();
 
 /* ================================================================
    App window / recents / toast / navbar

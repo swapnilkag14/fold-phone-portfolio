@@ -27,8 +27,8 @@
 
       <!-- Background layers -->
       <div class="bg-name" aria-hidden="true">
-        <span class="bg-name-left">SWAPNIL</span>
-        <span class="bg-name-right">KAG</span>
+        <span class="bg-name-left" id="bgNameL">SWAPNIL</span>
+        <span class="bg-name-right" id="bgNameR">KAG</span>
       </div>
       <div class="bg-glow" aria-hidden="true"></div>
       <div class="bg-orbit" aria-hidden="true">
@@ -39,113 +39,161 @@
         <i class="dot dot-2"></i>
       </div>
 
-      <!-- Device group (scaled to fit) -->
-      <div class="device-group" id="deviceGroup">
+      <!-- Soft floor shadow under the device -->
+      <div class="phone-shadow" id="phoneShadow" aria-hidden="true"></div>
 
-        <!-- Unfolded device -->
-        <div class="device" id="device">
-          <div class="screen inner-screen">
+      <!--
+        Fold device — exact Foldfolio mechanics:
+        .device-pos  fold translate (keeps the stack centered) + idle float
+        .device-rig  1080x736 design space, scaled to fit
+        .panel-right base screen (right half when open)
+        .panel-leaf  swinging inner screen  rotateY(180→0), hinged on its right edge
+        .panel-cover front screen when folded rotateY(0→-180), hinged on its left edge
+      -->
+      <div class="device-pos" id="devicePos">
+        <div class="device-rig" id="deviceRig">
 
-            <!-- Android status bar -->
-            <div class="statusbar">
-              <span class="statusbar-time" id="statusTime">09:41</span>
-              <span class="statusbar-icons">
-                <svg class="ic" viewBox="0 0 16 12" fill="currentColor"><path d="M8 9.6a1.4 1.4 0 1 0 0 2.8 1.4 1.4 0 0 0 0-2.8zM8 6c-1.6 0-3 .6-4.1 1.7l1.5 1.5C6.1 8.5 7 8.1 8 8.1s1.9.4 2.6 1.1l1.5-1.5C11 6.6 9.6 6 8 6zM8 2.4c-2.6 0-5 1-6.8 2.8l1.5 1.5C4.1 5.3 6 4.5 8 4.5s3.9.8 5.3 2.2l1.5-1.5C13 3.4 10.6 2.4 8 2.4z"/></svg>
-                5G <i class="signal"></i><i class="battery"></i>
-              </span>
-            </div>
+          <!-- RIGHT PANEL — base screen -->
+          <div class="panel panel-right" id="panelRight">
+            <div class="panel-frame"></div>
+            <div class="panel-screen screen-right" id="screenRight">
+              <div class="plane" id="planeLive">
 
-            <!-- HOME SCREEN -->
-            <div class="home-screen" id="homeScreen">
-              <div class="home-widget">
-                <div class="home-clock" id="homeClock">14:32</div>
-                <div class="home-date" id="homeDate">Friday, October 24</div>
-                <div class="home-tag">Swapnil Kag · Android Developer</div>
+                <!-- Android status bar -->
+                <div class="statusbar">
+                  <span class="statusbar-time" id="statusTime">09:41</span>
+                  <span class="statusbar-icons">
+                    <svg class="ic" viewBox="0 0 16 12" fill="currentColor"><path d="M8 9.6a1.4 1.4 0 1 0 0 2.8 1.4 1.4 0 0 0 0-2.8zM8 6c-1.6 0-3 .6-4.1 1.7l1.5 1.5C6.1 8.5 7 8.1 8 8.1s1.9.4 2.6 1.1l1.5-1.5C11 6.6 9.6 6 8 6zM8 2.4c-2.6 0-5 1-6.8 2.8l1.5 1.5C4.1 5.3 6 4.5 8 4.5s3.9.8 5.3 2.2l1.5-1.5C13 3.4 10.6 2.4 8 2.4z"/></svg>
+                    5G <i class="signal"></i><i class="battery"></i>
+                  </span>
+                </div>
+
+                <!-- HOME SCREEN -->
+                <div class="home-screen" id="homeScreen">
+                  <div class="home-scroll" id="homeScroll">
+                    <div class="home-widget">
+                      <div class="home-clock" id="homeClock">14:32</div>
+                      <div class="home-date" id="homeDate">Friday, October 24</div>
+                      <div class="home-tag">Swapnil Kag · Android Developer</div>
+                    </div>
+                    <div class="app-grid" id="appGrid"></div>
+                    <div class="home-extras">
+                      <p class="home-label">Featured app</p>
+                      <div id="featuredCard"></div>
+                      <p class="home-label">Certifications</p>
+                      <div class="chips chips-home" id="certChips"></div>
+                      <p class="home-label">Currently</p>
+                      <div class="chips chips-home">
+                        <span class="chip">🧪 Migrating a 120-screen app to Compose</span>
+                        <span class="chip">📖 Reading — Android Performance Patterns</span>
+                        <span class="chip">🚀 Preparing MyNotes 3.0 release</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="dock" id="dock"></div>
+                </div>
+
+                <!-- APP WINDOW (dual-pane on the fold display) -->
+                <div class="app-window" id="appWindow" hidden>
+                  <aside class="app-rail" id="appRail"></aside>
+                  <main class="app-body" id="appBody"></main>
+                </div>
+
+                <!-- RECENTS -->
+                <div class="recents" id="recents" hidden>
+                  <p class="recents-title">Recent apps</p>
+                  <div class="recents-cards" id="recentsCards"></div>
+                  <button class="recents-clear" id="recentsClear">Clear all</button>
+                </div>
+
+                <!-- Android toast -->
+                <div class="toast" id="toast" hidden></div>
+
+                <!-- Android 3-button nav bar -->
+                <nav class="navbar" id="navbar">
+                  <button class="nav-btn" id="navBack" title="Back" aria-label="Back">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 5v14L5 12z"/></svg>
+                  </button>
+                  <button class="nav-btn" id="navHome" title="Home" aria-label="Home">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="8.4"/></svg>
+                  </button>
+                  <button class="nav-btn" id="navRecents" title="Recents" aria-label="Recents">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="5" y="5" width="14" height="14" rx="2.5"/></svg>
+                  </button>
+                </nav>
+
               </div>
-              <div class="app-grid" id="appGrid"></div>
-              <div class="dock" id="dock"></div>
             </div>
-
-            <!-- APP WINDOW (dual-pane on the fold display) -->
-            <div class="app-window" id="appWindow" hidden>
-              <aside class="app-rail" id="appRail"></aside>
-              <main class="app-body" id="appBody"></main>
-            </div>
-
-            <!-- RECENTS -->
-            <div class="recents" id="recents" hidden>
-              <p class="recents-title">Recent apps</p>
-              <div class="recents-cards" id="recentsCards"></div>
-              <button class="recents-clear" id="recentsClear">Clear all</button>
-            </div>
-
-            <!-- Android toast -->
-            <div class="toast" id="toast" hidden></div>
-
-            <!-- Android 3-button nav bar -->
-            <nav class="navbar" id="navbar">
-              <button class="nav-btn" id="navBack" title="Back" aria-label="Back">
-                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 5v14L5 12z"/></svg>
-              </button>
-              <button class="nav-btn" id="navHome" title="Home" aria-label="Home">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="8.4"/></svg>
-              </button>
-              <button class="nav-btn" id="navRecents" title="Recents" aria-label="Recents">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="5" y="5" width="14" height="14" rx="2.5"/></svg>
-              </button>
-            </nav>
-
-            <!-- Center crease of the fold display -->
-            <div class="crease" aria-hidden="true"></div>
+            <div class="sh sh-r" id="shR"></div>
           </div>
-        </div>
 
-        <!-- Folded cover phone (lock screen) -->
-        <div class="cover" id="cover">
-          <div class="screen cover-screen">
-            <div class="statusbar">
-              <span class="statusbar-time" id="coverTime">14:32</span>
-              <span class="statusbar-icons">5G <i class="signal"></i><i class="battery"></i></span>
+          <!-- LEAF — swinging inner screen (left half when open) -->
+          <div class="panel panel-leaf" id="panelLeaf">
+            <div class="panel-frame"></div>
+            <div class="panel-screen screen-leaf">
+              <!-- live visual mirror of #planeLive; clicks are mirrored back -->
+              <div class="plane plane-clone" id="planeClone" aria-hidden="true"></div>
             </div>
-            <div class="cover-inner">
-              <p class="cover-role">Android developer</p>
-              <div class="notif">
-                <div class="notif-icon notif-icon-grad">📱</div>
-                <div>
-                  <p class="notif-title">My Apps 2.0 shipped</p>
-                  <p class="notif-sub">Play Console · crash-free 99.8%</p>
-                </div>
-              </div>
-              <div class="notif">
-                <div class="notif-icon notif-icon-grad">💼</div>
-                <div>
-                  <p class="notif-title">New LinkedIn invitation</p>
-                  <p class="notif-sub">Network · 2h ago</p>
-                </div>
-              </div>
-            </div>
-            <div class="cover-bottom">
-              <div class="call-card">
-                <div class="call-avatar">SK</div>
-                <div class="call-info">
-                  <p class="call-name">Swapnil Kag</p>
-                  <p class="call-sub">Incoming call · about your next role</p>
-                </div>
-                <a class="call-btn" href="tel:+910000000000">✆ <span>slide to talk</span></a>
-              </div>
-              <a class="cover-mail" href="mailto:swapnil@example.com">swapnil@example.com</a>
-            </div>
-            <div class="cover-hint" id="coverHint">
-              <span>Scroll to unfold</span>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 5l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-            </div>
+            <div class="sh sh-f" id="shF"></div>
           </div>
-        </div>
 
-      </div><!-- /device-group -->
+          <!-- COVER — front screen while the phone is folded -->
+          <div class="panel panel-cover" id="panelCover">
+            <div class="panel-frame"></div>
+            <div class="panel-screen cover-screen">
+              <div class="statusbar">
+                <span class="statusbar-time" id="coverTime">14:32</span>
+                <span class="statusbar-icons">5G <i class="signal"></i><i class="battery"></i></span>
+              </div>
+              <div class="cover-clock">
+                <div class="cover-clock-time" id="coverClock">14:32</div>
+                <div class="cover-clock-date" id="coverDate">Friday, October 24</div>
+              </div>
+              <div class="cover-inner">
+                <p class="cover-role">Android developer</p>
+                <div class="notif">
+                  <div class="notif-icon notif-icon-grad">📱</div>
+                  <div>
+                    <p class="notif-title">My Apps 2.0 shipped</p>
+                    <p class="notif-sub">Play Console · crash-free 99.8%</p>
+                  </div>
+                </div>
+                <div class="notif">
+                  <div class="notif-icon notif-icon-grad">💼</div>
+                  <div>
+                    <p class="notif-title">New LinkedIn invitation</p>
+                    <p class="notif-sub">Network · 2h ago</p>
+                  </div>
+                </div>
+              </div>
+              <div class="cover-bottom">
+                <a class="cover-mail" href="mailto:swapnil@example.com">swapnil@example.com</a>
+              </div>
+              <div class="cover-hint" id="coverHint">
+                <span>Scroll to unfold</span>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 5l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              </div>
+
+              <!-- Incoming-call screen — fades in while the phone folds shut -->
+              <div class="call-screen" id="callScreen">
+                <p class="call-screen-label">Incoming call</p>
+                <div class="call-avatar call-avatar-big">SK</div>
+                <p class="call-screen-name">Swapnil Kag</p>
+                <p class="call-screen-sub">about your next role</p>
+                <a class="call-accept" href="tel:+919876543210">✆ <span>slide to talk</span></a>
+              </div>
+            </div>
+            <div class="sh sh-b" id="shB"></div>
+          </div>
+
+          <!-- Center crease of the fold display (the hinge seam) -->
+          <div class="crease" id="crease" aria-hidden="true"></div>
+
+        </div>
+      </div><!-- /device-pos -->
 
       <!-- Stage controls -->
-      <div class="stage-controls">
+      <div class="stage-controls" id="stageControls">
         <div class="ctl-group" role="radiogroup" aria-label="Background">
           <button class="ctl-pill" data-bg="basic" aria-pressed="true">Basic</button>
           <button class="ctl-pill" data-bg="glow" aria-pressed="false">Glow</button>
